@@ -1,0 +1,14 @@
+version: '3.8'  # Используем версию 3.8 для совместимости
+
+services:
+  app:
+    build: .
+    container_name: curl21.ru-container
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/usr/src/app
+    environment:
+      - NODE_ENV=production
+      - TERM=xterm-256color
+    restart: unless-stopped
