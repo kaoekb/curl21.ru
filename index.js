@@ -82,7 +82,7 @@ const server = http.createServer((req, res) => {
     req.headers['user-agent'] &&
     !req.headers['user-agent'].includes('curl')
   ) {
-    res.writeHead(302, { Location: 'https://github.com/hugomd/parrot.live' });
+    res.writeHead(302, { Location: 'https://github.com/kaoekb/curl21.ru' });
     return res.end();
   }
 
