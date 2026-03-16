@@ -3,11 +3,13 @@ const assert = require('node:assert/strict');
 
 const {
   buildFramePayload,
+  createTypingAnimation,
   flipFrame,
   listAvailableAnimations,
   resolveColorName,
   resolveFrameIntervalMs,
   resolveAnimationName,
+  resolveTypingEffect,
   sortFrameFiles,
   validateQuery
 } = require('../index');
@@ -53,7 +55,7 @@ test('listAvailableAnimations hides the default animation key', () => {
 
 test('resolveFrameIntervalMs keeps lock slower than the default animations', () => {
   assert.equal(resolveFrameIntervalMs('lock'), 100);
-  assert.equal(resolveFrameIntervalMs('lock-full'), 2000);
+  assert.equal(resolveFrameIntervalMs('lock-full'), 10);
   assert.equal(resolveFrameIntervalMs('duck'), 70);
   assert.equal(resolveFrameIntervalMs('default'), 70);
 });
@@ -63,6 +65,12 @@ test('resolveColorName allows calm rendering for lock while keeping defaults ran
   assert.equal(resolveColorName('lock-full'), 'green');
   assert.equal(resolveColorName('duck'), null);
   assert.equal(resolveColorName('default'), null);
+});
+
+test('resolveTypingEffect enables poster typing only for lock-full', () => {
+  assert.deepEqual(resolveTypingEffect('lock-full'), { pauseFrames: 1200 });
+  assert.equal(resolveTypingEffect('lock'), null);
+  assert.equal(resolveTypingEffect('duck'), null);
 });
 
 test('buildFramePayload clears the screen only when requested', () => {
@@ -80,4 +88,19 @@ test('buildFramePayload clears the screen only when requested', () => {
   assert.match(initialPayload, /\u001b\[2J\u001b\[3J\u001b\[H/);
   assert.doesNotMatch(nextPayload, /\u001b\[2J/);
   assert.match(nextPayload, /\u001b\[H/);
+});
+
+test('createTypingAnimation reveals text line-by-line and keeps a final pause', () => {
+  const animation = createTypingAnimation({
+    finalFrame: 'ab \ncd \n',
+    pauseFrames: 2
+  });
+
+  assert.equal(animation.frameCount, 8);
+  assert.equal(animation.getFrame(0), '|  \n   \n');
+  assert.equal(animation.getFrame(2), 'ab|\n   \n');
+  assert.equal(animation.getFrame(3), 'ab \n|  \n');
+  assert.equal(animation.getFrame(5), 'ab \ncd|\n');
+  assert.equal(animation.getFrame(6), 'ab \ncd \n');
+  assert.equal(animation.getFrame(7), 'ab \ncd \n');
 });

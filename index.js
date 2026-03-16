@@ -14,8 +14,11 @@ const ANIMATION_SETTINGS = {
     colorName: 'green'
   },
   'lock-full': {
-    frameIntervalMs: 2000,
-    colorName: 'green'
+    frameIntervalMs: 10,
+    colorName: 'green',
+    typingEffect: {
+      pauseFrames: 1200
+    }
   }
 };
 const PORT = Number(process.env.PARROT_PORT) || 3000;
@@ -132,10 +135,72 @@ const loadAnimations = async () => {
 const buildFramePayload = ({ clearScreen = false, colorName, frame }) =>
   `${clearScreen ? '\u001b[2J\u001b[3J' : ''}\u001b[H${colors[colorName](frame)}`;
 
+const createTypingAnimation = ({ finalFrame, pauseFrames = 0 }) => {
+  const endsWithNewline = finalFrame.endsWith('\n');
+  const visibleLines = endsWithNewline
+    ? finalFrame.slice(0, -1).split('\n')
+    : finalFrame.split('\n');
+  const width = Math.max(0, ...visibleLines.map((line) => line.length));
+  const logicalLines = [...visibleLines];
+
+  while (logicalLines.length > 0 && logicalLines.at(-1) === '') {
+    logicalLines.pop();
+  }
+
+  const logicalText = logicalLines.map((line) => line.replace(/\s+$/u, '')).join('\n');
+  const finalFrameWithNewline = `${visibleLines.join('\n')}${endsWithNewline ? '\n' : ''}`;
+
+  const renderFrame = (visibleChars, showCursor) => {
+    const buffer = visibleLines.map(() => Array(width).fill(' '));
+    let row = 0;
+    let column = 0;
+
+    for (let index = 0; index < visibleChars && index < logicalText.length; index += 1) {
+      const char = logicalText[index];
+
+      if (char === '\n') {
+        row += 1;
+        column = 0;
+        continue;
+      }
+
+      if (row < buffer.length && column < width) {
+        buffer[row][column] = char;
+      }
+
+      column += 1;
+    }
+
+    if (showCursor && row < buffer.length && column < width) {
+      buffer[row][column] = '|';
+    }
+
+    return `${buffer.map((line) => line.join('')).join('\n')}${endsWithNewline ? '\n' : ''}`;
+  };
+
+  return {
+    frameCount: logicalText.length + 1 + pauseFrames,
+    getFrame(index) {
+      if (index <= logicalText.length) {
+        return renderFrame(index, true);
+      }
+
+      return finalFrameWithNewline;
+    }
+  };
+};
+
 const streamFrames = (res, opts) => {
   let index = 0;
   let lastColor;
   const frames = opts.flip ? opts.frameSet.flipped : opts.frameSet.original;
+  const typingAnimation = opts.typingEffect
+    ? createTypingAnimation({
+        finalFrame: frames[0],
+        pauseFrames: opts.typingEffect.pauseFrames
+      })
+    : null;
+  const frameCount = typingAnimation ? typingAnimation.frameCount : frames.length;
   const frameIntervalMs = opts.frameIntervalMs || FRAME_INTERVAL_MS;
   const colorName = opts.colorName;
 
@@ -149,11 +214,11 @@ const streamFrames = (res, opts) => {
       buildFramePayload({
         clearScreen: true,
         colorName: nextColor,
-        frame: frames[index]
+        frame: typingAnimation ? typingAnimation.getFrame(index) : frames[index]
       })
     );
 
-    index = (index + 1) % frames.length;
+    index = (index + 1) % frameCount;
   };
 
   renderFrame();
@@ -203,6 +268,9 @@ const resolveFrameIntervalMs = (animationName) =>
 const resolveColorName = (animationName) =>
   ANIMATION_SETTINGS[animationName]?.colorName || null;
 
+const resolveTypingEffect = (animationName) =>
+  ANIMATION_SETTINGS[animationName]?.typingEffect || null;
+
 const createRequestHandler = (animations) => (req, res) => {
   const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
@@ -242,6 +310,7 @@ const createRequestHandler = (animations) => (req, res) => {
     frameSet: animations.get(animationName),
     colorName: resolveColorName(animationName),
     frameIntervalMs: resolveFrameIntervalMs(animationName),
+    typingEffect: resolveTypingEffect(animationName),
     ...validateQuery(requestUrl.searchParams)
   });
 
@@ -308,9 +377,11 @@ module.exports = {
   listAvailableAnimations,
   loadAnimations,
   loadFrameSet,
+  createTypingAnimation,
   resolveColorName,
   resolveFrameIntervalMs,
   resolveAnimationName,
+  resolveTypingEffect,
   selectColor,
   sortFrameFiles,
   startServer,
