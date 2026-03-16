@@ -69,15 +69,18 @@ test('buildFramePayload clears the screen only when requested', () => {
   const initialPayload = buildFramePayload({
     clearScreen: true,
     colorName: 'green',
-    frame: 'hello\n'
+    frame: 'hello\nworld\n'
   });
   const nextPayload = buildFramePayload({
     clearScreen: false,
     colorName: 'green',
-    frame: 'hello\n'
+    frame: 'hello\nworld\n'
   });
 
-  assert.match(initialPayload, /\u001b\[2J\u001b\[3J\u001b\[H/);
+  assert.match(initialPayload, /\u001b\[2J\u001b\[3J/);
   assert.doesNotMatch(nextPayload, /\u001b\[2J/);
-  assert.match(nextPayload, /\u001b\[H/);
+  assert.match(nextPayload, /\u001b\[1;1H/);
+  assert.match(nextPayload, /\u001b\[2;1H/);
+  assert.match(nextPayload, /\u001b\[K/);
+  assert.match(nextPayload, /\u001b\[4;1H\u001b\[J/);
 });
