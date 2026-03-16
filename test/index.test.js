@@ -1,7 +1,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { flipFrame, sortFrameFiles, validateQuery } = require('../index');
+const {
+  flipFrame,
+  listAvailableAnimations,
+  resolveAnimationName,
+  sortFrameFiles,
+  validateQuery
+} = require('../index');
 
 test('sortFrameFiles sorts filenames numerically', () => {
   assert.deepEqual(sortFrameFiles(['10.txt', '2.txt', '1.txt']), [
@@ -18,4 +24,26 @@ test('flipFrame mirrors each line without changing row order', () => {
 test('validateQuery parses flip flag case-insensitively', () => {
   assert.deepEqual(validateQuery(new URLSearchParams('flip=True')), { flip: true });
   assert.deepEqual(validateQuery(new URLSearchParams()), { flip: false });
+});
+
+test('resolveAnimationName keeps root on the default animation', () => {
+  assert.equal(resolveAnimationName('/'), 'default');
+  assert.equal(resolveAnimationName('/duck'), 'duck');
+  assert.equal(resolveAnimationName('/duck/'), 'duck');
+});
+
+test('resolveAnimationName rejects nested and invalid animation paths', () => {
+  assert.equal(resolveAnimationName('/duck/run'), null);
+  assert.equal(resolveAnimationName('/../duck'), null);
+  assert.equal(resolveAnimationName('/duck wings'), null);
+});
+
+test('listAvailableAnimations hides the default animation key', () => {
+  const animations = new Map([
+    ['default', {}],
+    ['duck', {}],
+    ['cat', {}]
+  ]);
+
+  assert.deepEqual(listAvailableAnimations(animations), ['cat', 'duck']);
 });

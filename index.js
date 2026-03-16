@@ -4,10 +4,13 @@ const http = require('node:http');
 const { URL } = require('node:url');
 const colors = require('colors/safe');
 
+const DEFAULT_ANIMATION_NAME = 'default';
 const FRAMES_PATH = path.join(__dirname, 'frames');
+const ANIMATIONS_PATH = path.join(__dirname, 'animations');
 const FRAME_INTERVAL_MS = 70;
 const PORT = Number(process.env.PARROT_PORT) || 3000;
 const REDIRECT_URL = 'https://github.com/kaoekb/curl21.ru';
+const ANIMATION_NAME_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
 
 const colorsOptions = [
   'red',
@@ -37,8 +40,22 @@ const sortFrameFiles = (files) =>
   [...files].sort((left, right) => {
     const leftIndex = Number.parseInt(left, 10);
     const rightIndex = Number.parseInt(right, 10);
+    const leftIsNumeric = Number.isFinite(leftIndex);
+    const rightIsNumeric = Number.isFinite(rightIndex);
 
-    return leftIndex - rightIndex;
+    if (leftIsNumeric && rightIsNumeric && leftIndex !== rightIndex) {
+      return leftIndex - rightIndex;
+    }
+
+    if (leftIsNumeric && !rightIsNumeric) {
+      return -1;
+    }
+
+    if (!leftIsNumeric && rightIsNumeric) {
+      return 1;
+    }
+
+    return left.localeCompare(right);
   });
 
 const flipFrame = (frame) =>
@@ -47,16 +64,59 @@ const flipFrame = (frame) =>
     .map((line) => [...line].reverse().join(''))
     .join('\n');
 
-const loadFrames = async () => {
-  const files = sortFrameFiles(await fs.readdir(FRAMES_PATH));
+const loadFrameSet = async (framesPath) => {
+  const files = sortFrameFiles(
+    (await fs.readdir(framesPath)).filter((file) => file.endsWith('.txt'))
+  );
+
+  if (files.length === 0) {
+    throw new Error(`No frame files found in ${framesPath}`);
+  }
+
   const original = await Promise.all(
-    files.map((file) => fs.readFile(path.join(FRAMES_PATH, file), 'utf8'))
+    files.map((file) => fs.readFile(path.join(framesPath, file), 'utf8'))
   );
 
   return {
     original,
     flipped: original.map(flipFrame)
   };
+};
+
+const loadAnimations = async () => {
+  const animations = new Map();
+
+  animations.set(DEFAULT_ANIMATION_NAME, await loadFrameSet(FRAMES_PATH));
+
+  let animationEntries = [];
+  try {
+    animationEntries = await fs.readdir(ANIMATIONS_PATH, { withFileTypes: true });
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      throw error;
+    }
+  }
+
+  for (const entry of animationEntries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    if (!ANIMATION_NAME_PATTERN.test(entry.name)) {
+      console.warn(`Skipping animation with invalid name: ${entry.name}`);
+      continue;
+    }
+
+    const framesPath = path.join(ANIMATIONS_PATH, entry.name);
+    try {
+      animations.set(entry.name, await loadFrameSet(framesPath));
+    } catch (error) {
+      console.warn(`Skipping animation "${entry.name}"`);
+      console.warn(error.message);
+    }
+  }
+
+  return animations;
 };
 
 const streamFrames = (res, opts) => {
@@ -84,23 +144,61 @@ const validateQuery = (searchParams) => ({
   flip: String(searchParams.get('flip')).toLowerCase() === 'true'
 });
 
-const createRequestHandler = (frameSet) => (req, res) => {
+const respondWithJson = (req, res, statusCode, payload) => {
+  res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+
+  if (req.method === 'HEAD') {
+    return res.end();
+  }
+
+  return res.end(JSON.stringify(payload));
+};
+
+const resolveAnimationName = (pathname) => {
+  const segments = pathname.split('/').filter(Boolean);
+
+  if (segments.length === 0) {
+    return DEFAULT_ANIMATION_NAME;
+  }
+
+  if (segments.length !== 1) {
+    return null;
+  }
+
+  const animationName = segments[0].toLowerCase();
+  if (!ANIMATION_NAME_PATTERN.test(animationName)) {
+    return null;
+  }
+
+  return animationName;
+};
+
+const listAvailableAnimations = (animations) =>
+  [...animations.keys()].filter((name) => name !== DEFAULT_ANIMATION_NAME).sort();
+
+const createRequestHandler = (animations) => (req, res) => {
   const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
   if (requestUrl.pathname === '/healthcheck') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ status: 'ok' }));
+    return respondWithJson(req, res, 200, { status: 'ok' });
   }
 
   if (req.method !== 'GET' && req.method !== 'HEAD') {
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ error: 'method_not_allowed' }));
+    return respondWithJson(req, res, 405, { error: 'method_not_allowed' });
   }
 
   const userAgent = req.headers['user-agent'] || '';
   if (!userAgent.includes('curl')) {
     res.writeHead(302, { Location: REDIRECT_URL });
     return res.end();
+  }
+
+  const animationName = resolveAnimationName(requestUrl.pathname);
+  if (!animationName || !animations.has(animationName)) {
+    return respondWithJson(req, res, 404, {
+      error: 'animation_not_found',
+      available: listAvailableAnimations(animations)
+    });
   }
 
   res.writeHead(200, {
@@ -114,7 +212,7 @@ const createRequestHandler = (frameSet) => (req, res) => {
   }
 
   const interval = streamFrames(res, {
-    frameSet,
+    frameSet: animations.get(animationName),
     ...validateQuery(requestUrl.searchParams)
   });
 
@@ -128,8 +226,8 @@ const createRequestHandler = (frameSet) => (req, res) => {
 };
 
 const startServer = async () => {
-  const frameSet = await loadFrames();
-  const server = http.createServer(createRequestHandler(frameSet));
+  const animations = await loadAnimations();
+  const server = http.createServer(createRequestHandler(animations));
 
   const shutdown = (signal) => {
     console.log(`${signal} received, shutting down`);
@@ -177,7 +275,10 @@ if (require.main === module) {
 module.exports = {
   createRequestHandler,
   flipFrame,
-  loadFrames,
+  listAvailableAnimations,
+  loadAnimations,
+  loadFrameSet,
+  resolveAnimationName,
   selectColor,
   sortFrameFiles,
   startServer,
