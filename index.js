@@ -8,8 +8,11 @@ const DEFAULT_ANIMATION_NAME = 'default';
 const FRAMES_PATH = path.join(__dirname, 'frames');
 const ANIMATIONS_PATH = path.join(__dirname, 'animations');
 const FRAME_INTERVAL_MS = 70;
-const ANIMATION_FRAME_INTERVALS_MS = {
-  lock: 100
+const ANIMATION_SETTINGS = {
+  lock: {
+    frameIntervalMs: 100,
+    colorName: 'green'
+  }
 };
 const PORT = Number(process.env.PARROT_PORT) || 3000;
 const REDIRECT_URL = 'https://github.com/kaoekb/curl21.ru';
@@ -127,14 +130,17 @@ const streamFrames = (res, opts) => {
   let lastColor;
   const frames = opts.flip ? opts.frameSet.flipped : opts.frameSet.original;
   const frameIntervalMs = opts.frameIntervalMs || FRAME_INTERVAL_MS;
+  const colorName = opts.colorName;
 
   const renderFrame = () => {
-    const nextColor = selectColor(lastColor);
-    lastColor = nextColor;
+    const nextColor = colorName || colorsOptions[selectColor(lastColor)];
+    if (!colorName) {
+      lastColor = colorsOptions.indexOf(nextColor);
+    }
 
     // Clear the screen and render the next frame in a new color.
     res.write('\033[2J\033[3J\033[H');
-    res.write(colors[colorsOptions[nextColor]](frames[index]));
+    res.write(colors[nextColor](frames[index]));
 
     index = (index + 1) % frames.length;
   };
@@ -181,7 +187,10 @@ const listAvailableAnimations = (animations) =>
   [...animations.keys()].filter((name) => name !== DEFAULT_ANIMATION_NAME).sort();
 
 const resolveFrameIntervalMs = (animationName) =>
-  ANIMATION_FRAME_INTERVALS_MS[animationName] || FRAME_INTERVAL_MS;
+  ANIMATION_SETTINGS[animationName]?.frameIntervalMs || FRAME_INTERVAL_MS;
+
+const resolveColorName = (animationName) =>
+  ANIMATION_SETTINGS[animationName]?.colorName || null;
 
 const createRequestHandler = (animations) => (req, res) => {
   const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
@@ -220,6 +229,7 @@ const createRequestHandler = (animations) => (req, res) => {
 
   const interval = streamFrames(res, {
     frameSet: animations.get(animationName),
+    colorName: resolveColorName(animationName),
     frameIntervalMs: resolveFrameIntervalMs(animationName),
     ...validateQuery(requestUrl.searchParams)
   });
@@ -286,6 +296,7 @@ module.exports = {
   listAvailableAnimations,
   loadAnimations,
   loadFrameSet,
+  resolveColorName,
   resolveFrameIntervalMs,
   resolveAnimationName,
   selectColor,

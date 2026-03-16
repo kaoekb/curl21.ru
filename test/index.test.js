@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   flipFrame,
   listAvailableAnimations,
+  resolveColorName,
   resolveFrameIntervalMs,
   resolveAnimationName,
   sortFrameFiles,
@@ -53,4 +54,10 @@ test('resolveFrameIntervalMs keeps lock slower than the default animations', () 
   assert.equal(resolveFrameIntervalMs('lock'), 100);
   assert.equal(resolveFrameIntervalMs('duck'), 70);
   assert.equal(resolveFrameIntervalMs('default'), 70);
+});
+
+test('resolveColorName allows calm rendering for lock while keeping defaults random', () => {
+  assert.equal(resolveColorName('lock'), 'green');
+  assert.equal(resolveColorName('duck'), null);
+  assert.equal(resolveColorName('default'), null);
 });
