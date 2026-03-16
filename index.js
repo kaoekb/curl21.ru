@@ -12,6 +12,10 @@ const ANIMATION_SETTINGS = {
   lock: {
     frameIntervalMs: 100,
     colorName: 'green'
+  },
+  'lock-full': {
+    frameIntervalMs: 2000,
+    colorName: 'green'
   }
 };
 const PORT = Number(process.env.PARROT_PORT) || 3000;
