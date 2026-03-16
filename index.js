@@ -129,25 +129,12 @@ const loadAnimations = async () => {
   return animations;
 };
 
-const buildFramePayload = ({ clearScreen = false, colorName, frame }) => {
-  const lines = frame.split('\n');
-  const renderedLines = lines
-    .map(
-      (line, index) => `\u001b[${index + 1};1H${colors[colorName](line)}\u001b[K`
-    )
-    .join('');
-
-  // Repaint each row explicitly so a terminal resize cannot desynchronize
-  // later lines from earlier wrapped output.
-  return `${clearScreen ? '\u001b[2J\u001b[3J' : ''}${renderedLines}\u001b[${
-    lines.length + 1
-  };1H\u001b[J`;
-};
+const buildFramePayload = ({ clearScreen = false, colorName, frame }) =>
+  `${clearScreen ? '\u001b[2J\u001b[3J' : ''}\u001b[H${colors[colorName](frame)}`;
 
 const streamFrames = (res, opts) => {
   let index = 0;
   let lastColor;
-  let shouldClearScreen = true;
   const frames = opts.flip ? opts.frameSet.flipped : opts.frameSet.original;
   const frameIntervalMs = opts.frameIntervalMs || FRAME_INTERVAL_MS;
   const colorName = opts.colorName;
@@ -158,15 +145,13 @@ const streamFrames = (res, opts) => {
       lastColor = colorsOptions.indexOf(nextColor);
     }
 
-    // Only clear once on connect; afterwards just jump home to avoid a visible blank frame.
     res.write(
       buildFramePayload({
-        clearScreen: shouldClearScreen,
+        clearScreen: true,
         colorName: nextColor,
         frame: frames[index]
       })
     );
-    shouldClearScreen = false;
 
     index = (index + 1) % frames.length;
   };
