@@ -9,7 +9,7 @@ const FRAMES_PATH = path.join(__dirname, 'frames');
 const ANIMATIONS_PATH = path.join(__dirname, 'animations');
 const FRAME_INTERVAL_MS = 70;
 const ANIMATION_FRAME_INTERVALS_MS = {
-  lock: 140
+  lock: 100
 };
 const PORT = Number(process.env.PARROT_PORT) || 3000;
 const REDIRECT_URL = 'https://github.com/kaoekb/curl21.ru';
