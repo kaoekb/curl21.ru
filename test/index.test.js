@@ -55,7 +55,7 @@ test('listAvailableAnimations hides the default animation key', () => {
 
 test('resolveFrameIntervalMs keeps lock slower than the default animations', () => {
   assert.equal(resolveFrameIntervalMs('lock'), 100);
-  assert.equal(resolveFrameIntervalMs('lock-full'), 10);
+  assert.equal(resolveFrameIntervalMs('lock-full'), 100);
   assert.equal(resolveFrameIntervalMs('duck'), 70);
   assert.equal(resolveFrameIntervalMs('default'), 70);
 });
@@ -68,7 +68,7 @@ test('resolveColorName allows calm rendering for lock while keeping defaults ran
 });
 
 test('resolveTypingEffect enables poster typing only for lock-full', () => {
-  assert.deepEqual(resolveTypingEffect('lock-full'), { pauseFrames: 1200 });
+  assert.deepEqual(resolveTypingEffect('lock-full'), { pauseFrames: 120 });
   assert.equal(resolveTypingEffect('lock'), null);
   assert.equal(resolveTypingEffect('duck'), null);
 });

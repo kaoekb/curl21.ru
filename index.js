@@ -14,10 +14,10 @@ const ANIMATION_SETTINGS = {
     colorName: 'green'
   },
   'lock-full': {
-    frameIntervalMs: 10,
+    frameIntervalMs: 100,
     colorName: 'green',
     typingEffect: {
-      pauseFrames: 1200
+      pauseFrames: 120
     }
   }
 };
