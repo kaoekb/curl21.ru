@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  buildFramePayload,
   flipFrame,
   listAvailableAnimations,
   resolveColorName,
@@ -60,4 +61,21 @@ test('resolveColorName allows calm rendering for lock while keeping defaults ran
   assert.equal(resolveColorName('lock'), 'green');
   assert.equal(resolveColorName('duck'), null);
   assert.equal(resolveColorName('default'), null);
+});
+
+test('buildFramePayload clears the screen only when requested', () => {
+  const initialPayload = buildFramePayload({
+    clearScreen: true,
+    colorName: 'green',
+    frame: 'hello\n'
+  });
+  const nextPayload = buildFramePayload({
+    clearScreen: false,
+    colorName: 'green',
+    frame: 'hello\n'
+  });
+
+  assert.match(initialPayload, /\u001b\[2J\u001b\[3J\u001b\[H/);
+  assert.doesNotMatch(nextPayload, /\u001b\[2J/);
+  assert.match(nextPayload, /\u001b\[H/);
 });

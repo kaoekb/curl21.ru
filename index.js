@@ -125,9 +125,13 @@ const loadAnimations = async () => {
   return animations;
 };
 
+const buildFramePayload = ({ clearScreen = false, colorName, frame }) =>
+  `${clearScreen ? '\u001b[2J\u001b[3J' : ''}\u001b[H${colors[colorName](frame)}`;
+
 const streamFrames = (res, opts) => {
   let index = 0;
   let lastColor;
+  let shouldClearScreen = true;
   const frames = opts.flip ? opts.frameSet.flipped : opts.frameSet.original;
   const frameIntervalMs = opts.frameIntervalMs || FRAME_INTERVAL_MS;
   const colorName = opts.colorName;
@@ -138,9 +142,15 @@ const streamFrames = (res, opts) => {
       lastColor = colorsOptions.indexOf(nextColor);
     }
 
-    // Clear the screen and render the next frame in a new color.
-    res.write('\033[2J\033[3J\033[H');
-    res.write(colors[nextColor](frames[index]));
+    // Only clear once on connect; afterwards just jump home to avoid a visible blank frame.
+    res.write(
+      buildFramePayload({
+        clearScreen: shouldClearScreen,
+        colorName: nextColor,
+        frame: frames[index]
+      })
+    );
+    shouldClearScreen = false;
 
     index = (index + 1) % frames.length;
   };
@@ -292,6 +302,7 @@ if (require.main === module) {
 
 module.exports = {
   createRequestHandler,
+  buildFramePayload,
   flipFrame,
   listAvailableAnimations,
   loadAnimations,
