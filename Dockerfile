@@ -1,20 +1,19 @@
-# Используем официальный образ Node.js
-FROM node:18
+# Используем компактный официальный образ Node.js
+FROM node:18-alpine
 
-# Создаем рабочую директорию в контейнере
 WORKDIR /usr/src/app
 
-# Копируем package.json и package-lock.json в контейнер
 COPY package*.json ./
 
-# Устанавливаем зависимости
-RUN npm install
+RUN npm ci --omit=dev && npm cache clean --force
 
-# Копируем все файлы проекта в контейнер
-COPY . .
+COPY --chown=node:node . .
 
-# Открываем порт, который будет использовать приложение
+ENV NODE_ENV=production \
+    PARROT_PORT=3000
+
+USER node
+
 EXPOSE 3000
 
-# Запускаем приложение
-CMD [ "node", "index.js" ]
+CMD ["npm", "start"]

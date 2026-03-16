@@ -1,0 +1,7 @@
+.git
+.gitignore
+.DS_Store
+node_modules
+npm-debug.log*
+frames_original
+test
