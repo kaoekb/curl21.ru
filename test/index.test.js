@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   flipFrame,
   listAvailableAnimations,
+  resolveFrameIntervalMs,
   resolveAnimationName,
   sortFrameFiles,
   validateQuery
@@ -46,4 +47,10 @@ test('listAvailableAnimations hides the default animation key', () => {
   ]);
 
   assert.deepEqual(listAvailableAnimations(animations), ['cat', 'duck']);
+});
+
+test('resolveFrameIntervalMs keeps lock slower than the default animations', () => {
+  assert.equal(resolveFrameIntervalMs('lock'), 140);
+  assert.equal(resolveFrameIntervalMs('duck'), 70);
+  assert.equal(resolveFrameIntervalMs('default'), 70);
 });

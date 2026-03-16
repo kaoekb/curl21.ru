@@ -8,6 +8,9 @@ const DEFAULT_ANIMATION_NAME = 'default';
 const FRAMES_PATH = path.join(__dirname, 'frames');
 const ANIMATIONS_PATH = path.join(__dirname, 'animations');
 const FRAME_INTERVAL_MS = 70;
+const ANIMATION_FRAME_INTERVALS_MS = {
+  lock: 140
+};
 const PORT = Number(process.env.PARROT_PORT) || 3000;
 const REDIRECT_URL = 'https://github.com/kaoekb/curl21.ru';
 const ANIMATION_NAME_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
@@ -123,6 +126,7 @@ const streamFrames = (res, opts) => {
   let index = 0;
   let lastColor;
   const frames = opts.flip ? opts.frameSet.flipped : opts.frameSet.original;
+  const frameIntervalMs = opts.frameIntervalMs || FRAME_INTERVAL_MS;
 
   const renderFrame = () => {
     const nextColor = selectColor(lastColor);
@@ -137,7 +141,7 @@ const streamFrames = (res, opts) => {
 
   renderFrame();
 
-  return setInterval(renderFrame, FRAME_INTERVAL_MS);
+  return setInterval(renderFrame, frameIntervalMs);
 };
 
 const validateQuery = (searchParams) => ({
@@ -176,6 +180,9 @@ const resolveAnimationName = (pathname) => {
 const listAvailableAnimations = (animations) =>
   [...animations.keys()].filter((name) => name !== DEFAULT_ANIMATION_NAME).sort();
 
+const resolveFrameIntervalMs = (animationName) =>
+  ANIMATION_FRAME_INTERVALS_MS[animationName] || FRAME_INTERVAL_MS;
+
 const createRequestHandler = (animations) => (req, res) => {
   const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
@@ -213,6 +220,7 @@ const createRequestHandler = (animations) => (req, res) => {
 
   const interval = streamFrames(res, {
     frameSet: animations.get(animationName),
+    frameIntervalMs: resolveFrameIntervalMs(animationName),
     ...validateQuery(requestUrl.searchParams)
   });
 
@@ -278,6 +286,7 @@ module.exports = {
   listAvailableAnimations,
   loadAnimations,
   loadFrameSet,
+  resolveFrameIntervalMs,
   resolveAnimationName,
   selectColor,
   sortFrameFiles,
